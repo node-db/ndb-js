@@ -1,0 +1,43 @@
+<script type="text/javascript" src="../lib/jquery-1.7.min.js"></script>
+<script type="text/javascript" src="../src/jquery.ndb-1.0.js"></script>
+
+<script type="text/javascript">
+	
+	var node = {
+		a : {
+			b : {
+				c : "hello world",
+				d : 12,
+			},
+			e : {
+				c: "word",
+				d: 12
+			}
+		}
+	}
+	
+	var r = null;
+	
+	var selectQuery1 = "a->b->c:/hello/";
+	r = select(node, selectQuery1, true);
+	console.log(r);
+	
+	var selectQuery2 = "a->e->d:[11,13]"
+	r = select(node, selectQuery2, true);
+	console.log(r);
+	
+	var updateQuery = "a->b->c:/hello/";
+	var updateValue = "e=false,f=12";
+	r = update(node, updateQuery, updateValue);
+	console.log(r);
+	
+	var deleteQuery = "a->b->c:/hello/"
+	var deleteColumns = "[c]"
+	r = remove(node, deleteQuery, deleteColumns);
+	console.log(r)
+	
+	var insertQuery = "a->k"
+	var insertValue = "e=true,f=14"
+	r = insert(node, insertQuery, insertValue);
+	console.log(r)
+</script>

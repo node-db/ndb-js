@@ -1,108 +1,274 @@
 /**
- * ndb4js
+ * node database for javascript
  * 
  * @author Huiyugeng
  */
 
-function select(node, query) {
-	return locate(node, query, true);
-}
-
-function update(node, query) {
+function statement(node, query) {
 	
 }
 
-function insert(node, query) {
-	
+/* select node */
+var selectResult = null;
+selectAction = function (node) {
+	selectResult.push(node);
+};
+
+function select(ndb, query) {
+	this.selectResult = new Array();
+	locate(ndb, query, false, selectAction);
+	return selectResult;
 }
 
-function remove(node, query) {
-	
+/* update node */
+var updateData = null;
+updateAction = function (node) {
+	if (updateData != null && typeof(updateData) == "object") {
+		for (var key in updateData) {
+			var value = updateData[key];
+			node[key] = value;
+		}
+	}
+};
+function update(ndb, query, updateValue) {
+	this.updateData = this.parseValue(updateValue);
+	locate(ndb, query, false, updateAction);
+	return ndb;
 }
 
-function locate(node, query, multi) {
-	var query_item = query;
-	var sub_query = query;
+/* insert node */
+var insertData = null;
+insertAction = function (node) {
+	if (insertData != null && typeof(insertData) == "object") {
+		for (var key in insertData) {
+			var value = insertData[key];
+			node[key] = value;
+		}
+	}
+};
+function insert(ndb, query, insertValue) {
+	this.insertData = this.parseValue(insertValue);
+	locate(ndb, query, true, insertAction);
+	return ndb;
+}
 
-	if (node != undefined && node != null){
+/* delete node */
+var removeColumns = null;
+removeAction = function (node) {
+	if (removeColumns == "block") {
+		for (var key in node) {
+			delete node[key];
+		}
+	} else if (typeof(removeColumns) == "object" && removeColumns.length > 0) {
+		for (var i = 0 ; i < removeColumns.length ; i++) {
+			var column = removeColumns[i];
+			delete node[column];
+		}
+	}
+};
+function remove(ndb, query, column) {
+	if (column != null && column.startsWith("[") && column.endsWith("]")) {
+		this.removeColumns = column.substring(1, column.length - 1).split(",");
+	} else {
+		this.removeColumns = "block";
+	}
+	locate(ndb, query, false, removeAction);
+	return ndb;
+}
 
-			if (query.indexOf("->") > -1){
-				query_item = query.substring(0, query.indexOf("->"));
-				sub_query = query.substring(query.indexOf("->") + 2, query.length);
-			}
+function locate(ndb, query, isCreate, action) {
+	if(query == null || query == ""){
+		return;
+	}
+	
+	var queryKey = query; //当前项
+	var subQuery = query; //子查询
 
-			if (query_item != sub_query){
-				if (query_item.length > 2 && query_item.startsWith("/") && query_item.endsWith("/")){
-					query_item = query_item.substring(1, query_item.length - 1);
+	if(ndb instanceof Array){
 
-				}else{
-					if (node[query_item] != undefined){
-						return locate(node[query_item], sub_query, multi);
+		for(var i = 0 ; i < ndb.length ; i++){
+			var ndbItem = ndb[i];
+			locate(ndbItem, subQuery, isCreate, action);
+		}
+		
+	} else if(ndb instanceof Object) {
+
+		if (query.indexOf("->") > -1) {
+			queryKey = query.substring(0, query.indexOf("->"));
+			subQuery = query.substring(query.indexOf("->") + 2, query.length);
+		}
+
+		if (isCreate && ndb[queryKey] == null) {
+			ndb[queryKey] = {};
+		}
+		if( subQuery != queryKey || queryKey.startsWith(":")){
+			if(queryKey.startsWith(":")){ //根据路径进行查询
+				var exp  = queryKey.substring(1, queryKey.length);
+					
+				for (var key in ndb) {
+					if (checkValue(key, exp)) {
+						if (subQuery.startsWith(":")){
+							locate(ndb, key, isCreate, action);
+						} else {
+							locate(ndb.get(key), subQuery, isCreate, action);
+						}
+						
 					}
 				}
 			} else {
-				if (query_item.indexOf(":") > -1){
-					var items = query_item.split(":");
-					if (items.length == 2){
-						var src_value = items[1];
-						var dst_value = node[items[0]];
-
-						if (src_value.length > 2 && src_value.startsWith("/") && src_value.endsWith("/")){
-							var regex = src_value.substring(1, src_value.length - 1);
-							var re = new RegExp(regex);
-							if (re.test(dst_value)){
-								return node;
-							}
-						} else if (src_value.length > 3 && src_value.startsWith("[") && src_value.endsWith("]") && src_value.indexOf(",") > 0){
-							var region = src_value.substring(1, src_value.length - 1).split(",");
-							if (region.length == 2){
-								var _min = parseInt(region[0]);
-								var _max = parseInt(region[1]);
-								var _value = parseInt(dst_value);
-								if (_min != NaN && _max != NaN && _value >= _min && _value <= _max){
-									return node;
-								}
-							}
-						} else if (src_value.startsWith("^")) {
-							if (dst_value.startsWith(src_value.substring(1, src_value.length))){
-								return node;
-							}
-						} else if (src_value.endsWith("$")){
-							if (dst_value.endsWith(src_value.substring(1, src_value.length))){
-								return node;
-							}
-						}else {
-							if (src_value == dst_value){
-								return node;
-							}
+				locate(ndb[queryKey], subQuery, isCreate, action);
+			}
+		}else{
+			if(subQuery.indexOf(":") > -1){ //根据值进行查询
+				var matchItems = subQuery.split("&&");
+				
+				var matchResult = true;
+				for (var i = 0 ; i < matchItems.length ; i++) {
+					var matchItem = matchItems[i];
+					var items = matchItem.split(":");
+					if(items.length == 2){
+						var key = items[0];
+						var exp = items[1];
+						
+						var value = ndb[key];
+						
+						if (! checkValue(value, exp)) {
+							matchResult = false;
 						}
 					}
 				}
+				
+				if (matchResult) {
+					action(ndb);
+				}
+			} else {
+				var result = ndb[queryKey];
+				//创建模式
+				if (isCreate) {
+					if (result instanceof Array) {
+						var list = result;
+						
+						var item = {};
+						action(item);
+						list.push(item);
+					} else if (result instanceof Object) {
+						var item = result;
+						if (countObject(item) == 0) {
+							action(item);
+						} else {
+							var newItem = {};
+							action(newItem);
+							
+							var list = new Array();
+							list.push(item);
+							list.push(newItem);
+							
+							ndb[queryKey] = list;
+						}
+						
+					}
+				} else {
+					if (result instanceof Array) {
+						var list = result;
+						for (var i = 0 ; i < list.length ; i++){
+							var item = list[i];
+							action(item);
+						}
+					}else{
+						action(result);
+					}
+				}
 			}
+		}
 	}
 }
 
-String.prototype.startsWith = function(str){
-	if (str == undefined){
-		return false;
-	}     
-		var len = str.length;
-		if (len > this.length){
-			return false;
+function checkValue(value, exp) {
+	
+	if (exp.length > 2 && exp.startsWith("/") && exp.endsWith("/")) {
+		var regex = exp.substring(1, exp.length - 1);
+		var re = new RegExp(regex);
+		if (re.test(value)) {
+			return true;
 		}
-		var sub_string = this.substring(0, len);
-		return (sub_string == str);
-}  
-
-String.prototype.endsWith = function(str){     
-	if (str == undefined){
-		return false;
-	}     
-		var len = str.length;
-		if (len > this.length){
-			return false;
+	} else if (exp.length > 3 && exp.startsWith("[") && exp.endsWith("]") && exp.indexOf(",") > 0) {
+		var region = exp.substring(1, exp.length - 1).split(",");
+		if (region.length == 2) {
+			var _min = parseInt(region[0]);
+			var _max = parseInt(region[1]);
+			var _value = parseInt(value);
+			if (_min != NaN && _max != NaN && _value >= _min && _value <= _max) {
+				return true;
+			}
 		}
-		var sub_string = this.substring(this.length - len, this.length);
-		return (sub_string == str);       
+	} else if (exp.startsWith("^")) {
+		if (value.startsWith(exp.substring(1, exp.length))) {
+			return true;
+		}
+	} else if (exp.endsWith("$")) {
+		if (value.endsWith(exp.substring(1, exp.length))) {
+			return true;
+		}
+	} else {
+		if (exp == value) {
+			return true;
+		}
+	}
+	
+	return false;
 }
 
+function countObject(obj) {
+	var count = 0;
+	if (obj != null && obj instanceof Object && (obj instanceof Array) == false) {
+		for (var key in obj) {
+			if(obj.hasOwnProperty(key))	{
+				count++;
+			}
+		}
+	}
+	return count;
+}
+
+function parseValue(value) {
+	var data = new Object();
+	if (value != undefined && value != "") {
+		var values = value.split(",");
+		for (var i = 0 ; i < values.length ; i++) {
+			var tempValue = values[i];
+			var valuePair = tempValue.split("=");
+			if (valuePair != null && valuePair.length == 2) {
+				data[valuePair[0]] = valuePair[1];
+			}
+		}
+	}
+	return data;
+}
+
+function read(ndb) {
+
+}
+
+String.prototype.startsWith = function(str) {
+	if (str == undefined) {
+		return false;
+	}
+	var len = str.length;
+	if (len > this.length) {
+		return false;
+	}
+	var subString = this.substring(0, len);
+	return (subString == str);
+};
+
+String.prototype.endsWith = function(str) {
+	if (str == undefined) {
+		return false;
+	}
+	var len = str.length;
+	if (len > this.length) {
+		return false;
+	}
+	var subString = this.substring(this.length - len, this.length);
+	return (subString == str);
+};
