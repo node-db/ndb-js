@@ -4,9 +4,76 @@
  * @author Huiyugeng
  */
 
-function statement(node, query) {
+function execute(node, query) {
+	var command = null;
 	
+	if (node == null || ((node instanceof Object) == false || (node instanceof Object) == false)) {
+		return null;
+	}
+	
+	if (query.indexOf(":") > -1 ) {
+		command = query.substring(0, query.indexOf(":")).trim();
+		query = query.substring(query.indexOf(":") + 1, query.length).trim();
+	}
+	
+	var queryItems = query.split("!!");
+	
+	if (queryItems != null) {
+		var path = null;
+		var value = null;
+		if (queryItems.length > 0) {
+			path = queryItems[0].trim();
+		}
+		if (queryItems.length > 1) {
+			value = queryItems[1].trim();
+		}
+		
+		function __execute(node, command, path, value) {
+			var result = null;
+			if (command != null) {
+				if (command == "exist") {
+					result = select(node, path, true);
+					if (result != null && result instanceof Array && result.length > 0) {
+						result = true;
+					} else {
+						result = false;
+					}
+				} else if (command == "select") {
+					result = select(node, path, true);
+				} else if (command == "one") {
+					result = select(node, path, true);
+					if (result != null && result instanceof Array && result.length > 0) {
+						result = result[0];
+					}
+				} else if (command == "delete") {
+					result = remove(node, path, value);
+				} else if (command == "update") {
+					result = update(node, path, value);
+				} else if (command == "insert") {
+					result = insert(node, path, value);
+				}
+			}
+			
+			return result;
+		}
+		
+		if (node instanceof Array) {
+			var result = new Array();
+			for (var item in ndb) {
+				if (item instanceof Object) {
+					result.push(__execute(node, command, path, value));
+				}
+			}
+			return result;
+		} else if (node instanceof Object) {
+			return __execute(node, command, path, value);
+		}
+	}
+	
+	return null;
 }
+
+
 
 /* select node */
 var selectResult = null;
@@ -94,8 +161,8 @@ function locate(ndb, query, isCreate, action) {
 	} else if(ndb instanceof Object) {
 
 		if (query.indexOf("->") > -1) {
-			queryKey = query.substring(0, query.indexOf("->"));
-			subQuery = query.substring(query.indexOf("->") + 2, query.length);
+			queryKey = query.substring(0, query.indexOf("->")).trim();
+			subQuery = query.substring(query.indexOf("->") + 2, query.length).trim();
 		}
 
 		if (isCreate && ndb[queryKey] == null) {
@@ -106,11 +173,12 @@ function locate(ndb, query, isCreate, action) {
 				var exp  = queryKey.substring(1, queryKey.length);
 					
 				for (var key in ndb) {
-					if (checkValue(key, exp)) {
+					var check = checkValue(key, exp);
+					if (check == true) {
 						if (subQuery.startsWith(":")){
 							locate(ndb, key, isCreate, action);
 						} else {
-							locate(ndb.get(key), subQuery, isCreate, action);
+							locate(ndb[key], subQuery, isCreate, action);
 						}
 						
 					}
@@ -127,12 +195,13 @@ function locate(ndb, query, isCreate, action) {
 					var matchItem = matchItems[i];
 					var items = matchItem.split(":");
 					if(items.length == 2){
-						var key = items[0];
-						var exp = items[1];
+						var key = items[0].trim();
+						var exp = items[1].trim();
 						
 						var value = ndb[key];
 						
-						if (! checkValue(value, exp)) {
+						var check = checkValue(value, exp);
+						if (check == false) {
 							matchResult = false;
 						}
 					}
@@ -238,7 +307,7 @@ function parseValue(value) {
 			var tempValue = values[i];
 			var valuePair = tempValue.split("=");
 			if (valuePair != null && valuePair.length == 2) {
-				data[valuePair[0]] = valuePair[1];
+				data[valuePair[0].trim()] = valuePair[1].trim();
 			}
 		}
 	}
@@ -247,6 +316,10 @@ function parseValue(value) {
 
 function read(ndb) {
 
+}
+
+String.prototype.trim = function() {
+	return this.replace(/^\s+/g,"").replace(/\s+$/g,"");
 }
 
 String.prototype.startsWith = function(str) {
