@@ -1,75 +1,154 @@
-ndb4js
-=====
+#ndb-js#
 
-ndb是一种轻量级的节点型数据库，ndb4js是ndb数据库的javascript实现
+ndb(node database) 是一种轻量级嵌入式的文档型数据库, ndb-js是ndb数据库的javascript实现，可极大简化javascript中操作对象数据的方法. 
 
-=====
+- 可扩展的数据格式（Flexible Data Model）
+- 使用表达式查询语言(Expressive Query Language)
+- 采用程序嵌入的方式（Embedded Program）
 
-ndb语法规则
+下载路径：ndb-1.0.js
 
-格式：
-operate:path->query:value
+## ndb语法规则 ##
 
-查询：
-select:node->node->item1 : value1 && item2 : value2
+**ndb 语法格式：**
+> command:path->query:value
 
-需要支持多条件查询，每个item都与value对应
+command是操作指令，包括select、one、update、delete、insert、delete<br/>
+path是检索路径，格式为：node->node，通过层级关系进行指定检索路径<br/>
+item是检索项，value是检索值
 
-value 支持正则表达式，数值区域，startwith 和 end with：
-正则表达式使用 / 进行分割，例如 /[aA].*/
-数值区域仅对整数区域有效，使用 [min, max] 描述，例如 [12,17]
-startwith使用^开头，例如^hello
-endwith使用$结尾，例如hello$
+**查询列表(select)**
+> select:path->item1:value1 && item2:value2
 
-如果不含item检索条件，则返回整个node
+检索路径(path)和检索值(value) 支持正则表达式，数值区域，startwith 和 endwith：
 
-查询单个：
-one:node->node->item1 : value1 && item2 : value2
-与查询一致，当出现多个结果时，仅返回第一个结果
+- 正则表达式使用 / 进行分割，例如 /[aA].*/
+- 数值区域仅对整数区域有效，使用 [min, max] 描述，例如 [12,17]
+- startwith使用^开头，例如^hello
+- endwith使用$结尾，例如hello$
 
-修改：
-update:node->node->item : value $$ item1=new value1,item2=new value2…
-item : value用于检索对应的node，然后根据后面的值对node中的item进行修改
+select的返回值是一个列表，其中包括全部符合查询路径和条件的节点
 
-删除：
-delete:node->node->item : value $$ item / block
-如果使用item 标注，则仅删除item项目
+**查询单个(one)**
+> one:path->item1:value1 && item2:value2
+
+one的使用方法与select一致，当出现多个结果时，仅返回第一个结果
+
+**修改(update)**
+> update:node->node->item:value !! item1=value1,item2=value2
+
+item : value用于检索对应的node，根据后面的值对节点中的数据进行修改
+
+**删除(delete)**
+> delete:path->item : value !! [item1, item2] / block
+
+如果使用item 标注，则仅删除item条目，多个item使用","分割
 如果使用block标注，则删除item的父node项目
 
+**新增(insert)**
+> insert:path && item1=new value1,item2=new value
 
-新增：
-insert:node->node && item1=new value1,item2=new value2…
-在node中新建item，如果父路径不存在，则自动建立父路径
-
-遍历：
-travel
-遍历所有的节点，通常需要配合处理函数（Java，Python，Javascript）
+在节点中新建item，如果父路径不存在，则自动建立父路径
 
 
-举例说明：
-firewall {
-host {
-name : OA-FW
-ip: 192.168.0.12
-security: 50
-}
-}
+## ndb使用样例 ##
 
-检索host节点：
-select:firewall->host->name:/.*FW/
-select:firewall->host->security:[40,60] 
-select:firewall->host->ip:^192.168 
-select:firewall->host->name:FW$ 
-select:firewall->host->name:OA-FW
-select:firewall->host
+举例说明（数据样例）：
 
-删除name项目：
-delete:firewall->host->name:OA-FW && item 
-删除host节点：
-delete:firewall->host->name:OA-FW && block 
+    root {
+    	parent {
+			name : green
+    		child [{
+    				name: jim
+    				age: 20
+    				sex: male
+    				}, {
+    				name: lily
+    				age: 17
+    				sex: female
+    				}, {
+    				name: tom
+    				age: 28
+    				sex: male
+    			}]
+			nephew {
+				name: lucy
+				age: 12
+				sex: female
+			}
+    	}
+		
+    }
 
-节点host中name值变化为OA，ip值变化为192.168.0.15：
-update:firewall->host->name:OA-FW && name=OA,ip=192.168.0.15 
 
-节点firewall中增加节点interface，并将name=eth0,ip=192.168.0.16赋值如interface节点中：
-insert:firewall->interface && name=eth0,ip=192.168.0.16 
+**one**
+
+获得sex为male的第一个数据
+
+	one:root->parent->child->sex:male
+
+**select**
+
+获得name为jim和tom的child
+
+	select:root->parent->child->name:/.*m/
+
+获得age在15-25之间的child
+
+	select:root->parent->child->age:[15,25]  
+
+获得sex以fe开头的child
+
+	select:root->parent->child->sex:^fe
+ 
+获得name为m结尾的child  
+
+	select:root->parent->child->name:m$  
+
+获得sex为male，age在15-25之间的child
+
+	select:root->parent->child->sex:male && age:[15,25] 
+
+获得root->parent下所有的child  
+
+	select:root->parent->child   
+
+获得root->parent中sex为female的child和nephew  
+
+	select:root->parent->:/child|nephew/->sex:female 
+
+**delete**
+
+删除name为jim的sex和age属性：
+
+	delete:root->parent->child->name:jim !! [sex, age]  
+
+删除name为jim的所有属性，其中block为可选参数：
+
+	delete:root->parent->child->name:jim !! block 
+
+**update**
+
+修改name为jim的age值，并增加address值
+	
+	update:root->parent->child->name:jim !! age=21, address=China 
+
+**insert**
+
+增加name为bill的child
+
+	insert:root->parent->child !! name=bill, sex=male, age=31
+
+
+## 在javascript中使用ndb ##
+
+	<script type="text/javascript" src="ndb-1.0.js"></script>
+	<script type="text/javascript">
+	
+		<!--Node Data-->
+
+		var query = "select:root->parent->child->name:/.*m/";
+		var r = execute(node, query)
+		alert(r[0].name); //Output: jim
+		alert(r[1].name); //Output: tom
+	</script>
