@@ -73,8 +73,6 @@ function execute(node, query) {
 	return null;
 }
 
-
-
 /* select node */
 var selectResult = null;
 selectAction = function (node) {
@@ -129,7 +127,9 @@ removeAction = function (node) {
 	} else if (typeof(removeColumns) == "object" && removeColumns.length > 0) {
 		for (var i = 0 ; i < removeColumns.length ; i++) {
 			var column = removeColumns[i];
-			delete node[column];
+			if (column != undefined) {
+				delete node[column.trim()];
+			}
 		}
 	}
 };
@@ -275,7 +275,7 @@ function checkValue(value, exp) {
 			return true;
 		}
 	} else if (exp.endsWith("$")) {
-		if (value.endsWith(exp.substring(1, exp.length))) {
+		if (value.endsWith(exp.substring(0, exp.length-1))) {
 			return true;
 		}
 	} else {
