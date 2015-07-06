@@ -31,6 +31,7 @@ function execute(node, query) {
 		function __execute(node, command, path, value) {
 			var result = null;
 			if (command != null) {
+				command = command.toLowerCase()
 				if (command == "exist") {
 					result = select(node, path, true);
 					if (result != null && result instanceof Array && result.length > 0) {
