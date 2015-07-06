@@ -7,7 +7,7 @@
 function execute(node, query) {
 	var command = null;
 	
-	if (node == null || ((node instanceof Object) == false || (node instanceof Object) == false)) {
+	if (node == null || ((node instanceof Array) == false && (node instanceof Object) == false)) {
 		return null;
 	}
 	

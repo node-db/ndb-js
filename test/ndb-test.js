@@ -86,7 +86,7 @@ QUnit.test("update test", function(assert) {
 	
 	query = "update:root->parent->child->name:jim !! age=21, address=China";
 	r = execute(node, query)
-	query = "select : root->parent->child->name:jim";
+	query = "select:root->parent->child->name:jim";
 	r = execute(node, query)
 	assert.ok(r[0].age == "21", "Passed!");
 	assert.ok(r[0].address == "China", "Passed!");
@@ -110,7 +110,7 @@ QUnit.test("delete test", function(assert) {
 	
 	query = "delete:root->parent->child->name:jim !! [sex, age]";
 	r = execute(node, query)
-	query = "select : root->parent->child->name:jim";
+	query = "select:root->parent->child->name:jim";
 	r = execute(node, query)
 	assert.ok(r[0].name == "jim", "Passed!");
 	assert.ok(r[0].sex == undefined, "Passed!");
@@ -118,7 +118,7 @@ QUnit.test("delete test", function(assert) {
 	
 	query = "delete:root->parent->child->name:jim !! block";
 	r = execute(node, query)
-	query = "select : root->parent->child->name:jim";
+	query = "select:root->parent->child->name:jim";
 	r = execute(node, query)
 	assert.ok(r.name == undefined, "Passed!");
 });
