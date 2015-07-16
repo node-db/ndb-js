@@ -255,6 +255,10 @@ function locate(ndb, query, isCreate, action) {
 
 function checkValue(value, exp) {
 	
+	if (value == null || exp == null) {
+		return false;
+	}
+	
 	if (exp.length > 2 && exp.startsWith("/") && exp.endsWith("/")) {
 		var regex = exp.substring(1, exp.length - 1);
 		var re = new RegExp(regex);
